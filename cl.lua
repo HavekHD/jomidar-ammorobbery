@@ -32,7 +32,17 @@ local function hasItem(item)
     if exports['ox_inventory'] then
         local items = exports.ox_inventory:Search('count', item)
         print('ox_inventory items:', json.encode(items)) -- Debugging output
-        local count = items[item] or 0
+
+        -- Improved logic to handle different item keys
+        local count = 0
+        for k, v in pairs(items) do
+            if k:lower() == item:lower() then
+                count = v
+                break
+            end
+        end
+
+        print('ox_inventory count:', count) -- Debugging output
         return count > 0
     else
         local itemInfo = QBCore.Functions.HasItem(item)
@@ -45,7 +55,15 @@ local function hasItem(item)
     end
 end
 
-local function handleContainerOpen(k)
+local function handleContainerOpen(data)
+    local k = data.args.k
+    print("handleContainerOpen called with k:", k) -- Debugging output
+    if k == nil or Config['containers'][k] == nil then
+        print("Invalid container index:", k)
+        QBCore.Functions.Notify("Invalid container", "error")
+        return
+    end
+
     local result = hasItem(Config.requiredItem)
     print("HasItem result:", result) -- Debugging output
     if result then
@@ -186,6 +204,7 @@ AddEventHandler('jomidar-ammorobbery:cl:start', function()
 end)
 
 function SetupContainers()
+    print("Setting up containers") -- Debugging output
     containersBlip = AddBlipForCoord(1088.02, -3193.23, 5.9)
     SetBlipSprite(containersBlip, 677)
     SetBlipColour(containersBlip, 1)
@@ -199,7 +218,7 @@ function SetupContainers()
     loadModel('prop_ld_container')
     rndContainer = math.random(1, #Config['containers'])
 
-    print(rndContainer)
+    print("Random container selected:", rndContainer) -- Debugging output
     if rndContainer == 1 then
         exports['jomidar-ui']:Show('Ammunation Containers', 'Rob the container S8B5')
     elseif rndContainer == 2 then
@@ -215,6 +234,7 @@ function SetupContainers()
     end
 
     for k, v in pairs(Config['containers']) do
+        print("Setting up container", k) -- Debugging output
         loadModel(Config['containers'][k].containerModel)
         Wait(100)
         containers[k] = CreateObject(GetHashKey(Config['containers'][k].containerModel), v.pos, 1, 1, 0)
@@ -240,7 +260,7 @@ function SetupContainers()
                     event = "jomidar-ammorobbery:handleContainerOpen",
                     icon = "fas fa-user-secret",
                     label = "Open Container",
-                    args = k
+                    args = { k = k }  -- Pass the index in a table
                 },
             },
             job = {"all"},
@@ -461,6 +481,7 @@ AddEventHandler('onResourceStop', function (resource)
 end)
 
 RegisterNetEvent('jomidar-ammorobbery:handleContainerOpen')
-AddEventHandler('jomidar-ammorobbery:handleContainerOpen', function(k)
-    handleContainerOpen(k)
+AddEventHandler('jomidar-ammorobbery:handleContainerOpen', function(data)
+    print('Received data:', json.encode(data)) -- Debugging output
+    handleContainerOpen(data)  -- Extract the index correctly
 end)
